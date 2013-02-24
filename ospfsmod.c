@@ -452,7 +452,7 @@ ospfs_dir_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		 * the loop.  For now we do this all the time.
 		 *
 		 * EXERCISE: Your code here */
-    if (f_pos >= dir_io->filp->size)
+    if (f_pos >= dir_oi->filp->size)
     {
       r = 1;
       break;
@@ -482,7 +482,7 @@ ospfs_dir_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		/* EXERCISE: Your code here */
 
     /* TODO: am I sure about the -2 on the end here?  -------v  */
-    od = (ospfs_direntry_t *) ospfs_inode_data(dir_io, f_pos-2);
+    od = (ospfs_direntry_t *) ospfs_inode_data(dir_oi, f_pos-2);
 
     if (od->od_ino == 0)  // Skipped entry
     {
@@ -903,18 +903,21 @@ add_block(ospfs_inode_t *oi)
       allocated[0] = &oi->oi_indirect2;
     }
     
-    allo_block = allocate_block();
-    if(allo_block == 0)
-    {
-      if(allocated[0])
-        free_block(allocated[0][0]);
-      return -ENOSPC;
-    }
     uint32_t *indirect2 = (uint32_t *)ospfs_block(oi->oi_indirect2);
-    int index2 = (n - OSPFS_NDIRECT + OSPFS_NINDIRECT) / OSPFS_NINDIRECT;
-    indirect2[index2] = allo_block;
-    allocated[1] = &indirect2[index2];
+    int index2 = (n - OSPFS_NDIRECT - OSPFS_NINDIRECT) / OSPFS_NINDIRECT;
+    if(((n - OSPFS_NDIRECT - OSPFS_NINDIRECT) % OSPFS_NINDIRECT) == 0)
+    {
+      allo_block = allocate_block();
+      if(allo_block == 0)
+      {
+        if(allocated[0])
+          free_block(allocated[0][0]);
+        return -ENOSPC;
+      }
+      indirect2[index2] = allo_block;
+      allocated[1] = &indirect2[index2];
     
+    }
     allo_block = allocate_block();
     if(allo_block == 0)
     {
@@ -964,8 +967,49 @@ remove_block(ospfs_inode_t *oi)
 	// current number of blocks in file
 	uint32_t n = ospfs_size2nblocks(oi->oi_size);
 
-	/* EXERCISE: Your code here */
-	return -EIO; // Replace this line
+	if(n == 0)
+    return 0;
+	if(n <= OSPFS_NDIRECT)
+  {
+    free_block(oi->oi_direct[n-1]);
+    oi->oi_direct[n-1] = 0;
+    oi->oi_size -= OSPFS_BLKSIZE;
+  }
+  else if(n <= OSPFS_NDIRECT + OSPFS_NINDIRECT)
+  {
+    uint32_t *indirect = ospfs_block(oi->oi_indirect);
+    free_block(indirect[n-OSPFS_NDIRECT-1]);
+    indirect[n-OSPFS_NDIRECT-1] = 0;
+    if((n - OSPFS_NDIRECT - 1) == 0)
+    {
+      free_block(oi->oi_indirect);
+      oi->oi_indirect = 0;
+    }
+    oi->oi_size -= OSPFS_BLKSIZE;
+  }
+  else if(n <= OSPFS_MAXFILEBLKS)
+  {
+    uint32_t *indirect2 = ospfs_block(oi->oi_indirect2);
+    int index2 = (n - OSPFS_NINDIRECT - OSPFS_NDIRECT - 1) / OSPFS_NINDIRECT;
+    int index = (n - (OSPFS_NDIRECT - 1 + OSPFS_NINDIRECT + OSPFS_NINDIRECT*index2)) % OSPFS_NINDIRECT;
+    uint32_t *indirect = ospfs_block(indirect2[index2]);
+    free_block(indirect[index]);
+    indirect[index] = 0;
+    if(index == 0)
+    {
+      free_block(indirect2[index2]);
+      indirect2[index2] = 0;
+      if(index2 == 0)
+      {
+        free_block(oi->oi_indirect2);
+        oi->oi_indirect2 = 0;
+      }
+    }
+    oi->oi_size -= OSPFS_BLKSIZE;
+
+  }
+  else
+    return -EIO;
 }
 
 
@@ -1008,21 +1052,33 @@ remove_block(ospfs_inode_t *oi)
 static int
 change_size(ospfs_inode_t *oi, uint32_t new_size)
 {
+  uint32_t n = ospfs_size2nblocks(new_size);
 	uint32_t old_size = oi->oi_size;
 	int r = 0;
+  int grow_count = 0;
 
-	while (ospfs_size2nblocks(oi->oi_size) < ospfs_size2nblocks(new_size)) {
-	        /* EXERCISE: Your code here */
-		return -EIO; // Replace this line
+	while (ospfs_size2nblocks(oi->oi_size) < n) {
+	        /* Grow File */
+		r = add_block(oi);
+    if(r == -ENOSPC)
+    {
+      if(grow_count > 0)
+        change_size(oi,old_size); // Might want to check for -EIO
+      return r;
+    }
+    else if(r == -EIO)
+      return r;
+    grow_count++;
 	}
-	while (ospfs_size2nblocks(oi->oi_size) > ospfs_size2nblocks(new_size)) {
-	        /* EXERCISE: Your code here */
-		return -EIO; // Replace this line
+	while (ospfs_size2nblocks(oi->oi_size) > n) {
+	        /* Shrink File */
+		r = remove_block(oi);
+    if(r == -EIO)
+      return -EIO;
 	}
-
-	/* EXERCISE: Make sure you update necessary file meta data
-	             and return the proper value. */
-	return -EIO; // Replace this line
+	
+	oi->oi_size = new_size;
+	return 0;
 }
 
 
@@ -1276,7 +1332,7 @@ create_blank_direntry(ospfs_inode_t *dir_oi)
   int ret;
   ospfs_direntry_t *avail_entry = NULL;
   
-  for (off = 0; off < dir_oi->size; off += OSPFS_DIRENTRY_SIZE)
+  for (off = 0; off < dir_oi->oi_size; off += OSPFS_DIRENTRY_SIZE)
   {
     if ((avail_entry = 
           ((ospfs_direntry_t *) ospfs_inode_data(dir_oi, off)))->od_ino == 0)
@@ -1297,7 +1353,7 @@ create_blank_direntry(ospfs_inode_t *dir_oi)
     return ERR_PTR(ret);
 
   // Account for this new block, and return the first entry in it
-  dir_oi->size += OSPFS_BLKSIZE;
+  dir_oi->oi_size += OSPFS_BLKSIZE;
 
   return ((ospfs_direntry_t *) ospfs_inode_data(dir_oi, off));
   /* END MY CODE */
