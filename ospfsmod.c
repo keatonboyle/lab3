@@ -584,7 +584,18 @@ static uint32_t
 allocate_block(void)
 {
 	/* EXERCISE: Your code here */
+  uint32_t i;
+  int length_bits = (ospfs_super->os_firstinob - 2) * OSPFS_BLKBITSIZE;
+  for(i = 0; i < length_bits; i++)
+  {
+    if(bitvector_test(&ospfs_data[OSPFS_BLKSIZE * 2], i) == 1)
+    {
+      bitvector_clear(&ospfs_data[OSPFS_BLKSIZE * 2], i);
+      return i;
+    }
+  }
 	return 0;
+  /* END Curls code */
 }
 
 
@@ -603,6 +614,9 @@ static void
 free_block(uint32_t blockno)
 {
 	/* EXERCISE: Your code here */
+	if(blockno >= ospfs_super->os_firstinob + ospfs_super->os_ninodes)
+    bitvector_set(&ospfs_data[OSPFS_BLKSIZE * 2], blockno);
+  /* END Curls code */
 }
 
 
@@ -638,7 +652,31 @@ free_block(uint32_t blockno)
 static int32_t
 indir2_index(uint32_t b)
 {
-	// Your code here.
+  /* START Curls code */
+  /*ospfs_inode_t *node;
+  int i;
+  for(i = 0; i < ospfs_super->os_ninodes; i++)
+  {
+    if(bitvector_test(&ospfs_data[OSPFS_BLKSIZE * 2], i+ospfs->os_firstinob) == 1)
+      continue;
+    node = ospfs_inode(i);
+    if(node->oi_indirect2 != 0)
+    {
+      uint32_t *indirect2 = ospfs_block(node->oi_indirect2);
+      int j;
+      for(j = 0; j < OSPFS_NINDIRECT; j++)
+      {
+        if(indirect2[j] == 0)
+          continue;
+        uint32_t *indirect = opsfs_block(indirect2[j]);
+        int k;
+        for(k = 0; k < OSPFS_NINDIRECT; k++)
+         if(indirect[k] == b)
+           return node->oi_indirect2; // I feel like the return value should be the doubly block index
+      }
+    }
+  }*/
+  /* END Curls code */
 	return -1;
 }
 
@@ -657,7 +695,40 @@ indir2_index(uint32_t b)
 static int32_t
 indir_index(uint32_t b)
 {
-	// Your code here.
+  /* START Curls code */
+  /*uint32_t doub;
+  ospfs_inode_t *node;
+  int i;
+  
+	if((doub = indir2_index(b)) != -1)
+  {
+    //return the index of indirect within doubly
+    uint32_t *indirect2 = ospfs_block(doub);
+    for(i = 0; i < OSPFS_NINDIRECT; i++)
+    {
+      if(indirect2[i] == 0)
+        continue;
+      uint32_t *indirect = ospfs_block(indirect2[i]);
+      int j;
+      for(j = 0; j < OSPFS_NINDIRECT; j++)
+        if(indirect[j] == b)
+          return indirect2[i];
+    }
+  }
+  for(i = 0; i < ospfs_super->os_ninodes; i++)
+  {
+    if(bitvector_test(&ospfs_data[OSPFS_BLKSIZE * 2], i+ospfs->os_firstinob) == 1)
+      continue;
+    node = ospfs_inode(i);
+    if(node->oi_indirect == 0)
+      continue;
+    uint32_t *indirect = opsfs_block(node->oi_indirect);
+    int j;
+    for(j = 0; j < OSPFS_NINDIRECT; j++)
+      if(indirect[j] == b)
+        return 0;
+  }*/
+  /* END Curls code */
 	return -1;
 }
 
@@ -674,7 +745,74 @@ indir_index(uint32_t b)
 static int32_t
 direct_index(uint32_t b)
 {
-	// Your code here.
+  /* START Curls code */
+  /*uint32_t doub;
+  uint32_t ind;
+  int i;
+  ospfs_inode_t *node;
+  switch((ind = indir_index(b)))
+  {
+    case 0:  // It's in a regular indirect block
+    {
+      for(i = 0; i < ospfs_super->os_ninodes; i++)
+      {
+        if(bitvector_test(&ospfs_data[OSPFS_BLKSIZE * 2], i+ospfs->os_firstinob) == 1)
+          continue;
+        node = ospfs_inode(i);
+        if(node->oi_indirect == 0)
+          continue;
+        uint32_t *indirect = opsfs_block(node->oi_indirect);
+        int j;
+        for(j = 0; j < OSPFS_NINDIRECT; j++)
+          if(indirect[j] == b)
+            return j;
+      }
+      break;
+    }
+    case -1: // It's in a direct block
+    {
+       for(i = 0; i < ospfs_super->os_ninodes; i++)
+       {
+        if(bitvector_test(&ospfs_data[OSPFS_BLKSIZE * 2], i+ospfs->os_firstinob) == 1)
+          continue;
+        node = ospfs_inode(i);
+        if(node->oi_direct == 0)
+          continue;
+        uint32_t *direct = opsfs_block(node->oi_direct);
+        int j;
+        for(j = 0; j < OSPFS_NDIRECT; j++)
+          if(indirect[j] == b)
+            return j; 
+       }
+      break;
+    }
+    default:  // It was in a doubly
+    {
+      for(i = 0; i < ospfs_super->os_ninodes; i++)
+      {
+        if(bitvector_test(&ospfs_data[OSPFS_BLKSIZE * 2], i+ospfs->os_firstinob) == 1)
+          continue;
+        node = ospfs_inode(i);
+        if(node->oi_indirect2 != 0)
+        {
+          uint32_t *indirect2 = ospfs_block(node->oi_indirect2);
+          int j;
+          for(j = 0; j < OSPFS_NINDIRECT; j++)
+          {
+            if(indirect2[j] == 0)
+              continue;
+            uint32_t *indirect = opsfs_block(indirect2[j]);
+            int k;
+            for(k = 0; k < OSPFS_NINDIRECT; k++)
+            if(indirect[k] == b)
+              return k;
+          }
+        }
+      }      
+      break;
+    }
+  }*/
+  /* END Curls code */
 	return -1;
 }
 
@@ -720,7 +858,81 @@ add_block(ospfs_inode_t *oi)
 	uint32_t *allocated[2] = { 0, 0 };
 
 	/* EXERCISE: Your code here */
-	return -EIO; // Replace this line
+  uint32_t allo_block;
+  
+  if(n < OSPFS_NDIRECT)
+  {
+    allo_block = allocate_block();
+    if(allo_block == 0)
+      return -ENOSPC;
+    oi->oi_direct[n] = allo_block;
+    oi->oi_size += OSPFS_BLKSIZE;
+    return 0;
+    
+  }
+  else if(n < OSPFS_NDIRECT + OSPFS_NINDIRECT)
+  {
+    if(n == OSPFS_NDIRECT)
+    {
+      allo_block = allocate_block();
+      if(allo_block == 0)
+        return -ENOSPC;
+      oi->oi_indirect = allo_block;
+      allocated[0] = &oi->oi_indirect;
+    }
+    allo_block = allocate_block();
+    if(allo_block == 0)
+    {
+      if(allocated[0])
+        free_block(allocated[0][0]); // Not sure if I should set oi_indirect to zero also
+      return -ENOSPC;
+    }
+    uint32_t *indirect = ospfs_block(oi->oi_indirect);
+    indirect[n - OSPFS_NDIRECT] = allo_block;
+    oi->oi_size += OSPFS_BLKSIZE;
+    return 0;
+  }
+  else if(n < OSPFS_MAXFILEBLKS)
+  {
+    if(n == OSPFS_NDIRECT + OSPFS_NINDIRECT)
+    {
+      allo_block = allocate_block();
+      if(allo_block == 0)
+        return -ENOSPC;
+      oi->oi_indirect2 = allo_block;
+      allocated[0] = &oi->oi_indirect2;
+    }
+    
+    allo_block = allocate_block();
+    if(allo_block == 0)
+    {
+      if(allocated[0])
+        free_block(allocated[0][0]);
+      return -ENOSPC;
+    }
+    uint32_t *indirect2 = (uint32_t *)ospfs_block(oi->oi_indirect2);
+    int index2 = (n - OSPFS_NDIRECT + OSPFS_NINDIRECT) / OSPFS_NINDIRECT;
+    indirect2[index2] = allo_block;
+    allocated[1] = &indirect2[index2];
+    
+    allo_block = allocate_block();
+    if(allo_block == 0)
+    {
+      if(allocated[0])
+        free_block(allocated[0][0]);
+      if(allocated[1])
+        free_block(allocated[1][0]);
+      return -ENOSPC;
+    }
+    uint32_t *indirect = (uint32_t *)ospfs_block(indirect2[index2]);
+    int index = (n - (OSPFS_NDIRECT + OSPFS_NINDIRECT + OSPFS_NINDIRECT*index2)) % OSPFS_NINDIRECT;
+    indirect[index] = allo_block;
+    oi->oi_size += OSPFS_BLKSIZE;
+    return 0;
+  }
+  else
+    return -ENOSPC; // or -EIO?
+  /* END Curls code */
 }
 
 
