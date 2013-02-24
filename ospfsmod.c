@@ -452,8 +452,12 @@ ospfs_dir_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		 * the loop.  For now we do this all the time.
 		 *
 		 * EXERCISE: Your code here */
-		r = 1;		/* Fix me! */
-		break;		/* Fix me! */
+    if (f_pos >= dir_io->filp->size)
+    {
+      r = 1;
+      break;
+    }
+    /* END MY CODE*/
 
 		/* Get a pointer to the next entry (od) in the directory.
 		 * The file system interprets the contents of a
@@ -476,6 +480,33 @@ ospfs_dir_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		 */
 
 		/* EXERCISE: Your code here */
+
+    /* TODO: am I sure about the -2 on the end here?  -------v  */
+    od = (ospfs_direntry_t *) ospfs_inode_data(dir_io, f_pos-2);
+
+    if (od->od_ino == 0)  // Skipped entry
+    {
+      f_pos += OSPFS_DIRENTRY_SIZE;
+      continue;
+    }
+
+    entry_oi = ospfs_inode(od->od_ino);  // inode of the entry
+
+    ok_so_far = filldir(od, od->od_name, strnlen(od_name, OSPFS_MAXNAMELEN),
+                        f_pos, od->od_ino, entry_oi->oi_ftype);
+
+    if (ok_so_far >= 0)
+    {
+      f_pos += OSPFS_DIRENTRY_SIZE;
+    }
+    else
+    {
+      r = 0;
+      break;
+    }
+
+    /* END MY CODE */
+
 	}
 
 	// Save the file position and return!
@@ -846,6 +877,13 @@ ospfs_read(struct file *filp, char __user *buffer, size_t count, loff_t *f_pos)
 	// Change 'count' so we never read past the end of the file.
 	/* EXERCISE: Your code here */
 
+  if ((*f_pos + count) > filp->size)
+  {
+    count  = filp->size - f_pos;
+  }
+
+  /* END EXERCISE */
+
 	// Copy the data to user block by block
 	while (amount < count && retval >= 0) {
 		uint32_t blockno = ospfs_inode_blockno(oi, *f_pos);
@@ -865,8 +903,21 @@ ospfs_read(struct file *filp, char __user *buffer, size_t count, loff_t *f_pos)
 		// into user space.
 		// Use variable 'n' to track number of bytes moved.
 		/* EXERCISE: Your code here */
-		retval = -EIO; // Replace these lines
-		goto done;
+    if (count - amount >= OSPFS_BLKSIZE)
+    {
+      n = OSPFS_BLKSIZE;
+    }
+    else
+    {
+      n = count - amount;
+    }
+
+    if(copy_to_user(buffer, data, n))
+    {
+      retval = -EFAULT;
+      goto done;
+    }
+    /* END EXERCISE */
 
 		buffer += n;
 		amount += n;
@@ -1008,7 +1059,36 @@ create_blank_direntry(ospfs_inode_t *dir_oi)
 	//    entries and return one of them.
 
 	/* EXERCISE: Your code here. */
-	return ERR_PTR(-EINVAL); // Replace this line
+  // Using similar code to find_direntry
+  int off;
+  int ret;
+  ospfs_direntry_t *avail_entry = NULL;
+  
+  for (off = 0; off < dir_oi->size; off += OSPFS_DIRENTRY_SIZE)
+  {
+    if ((avail_entry = 
+          ((ospfs_direntry_t *) ospfs_inode_data(dir_oi, off)))->od_ino == 0)
+    {
+      // We've found an empty one!
+      return avail_entry;
+    }
+  }
+
+  /* TODO: Is something like change_size() a better way to do this?
+   *       This should work, I think, but it avoids a layer of abstraction */
+
+  // If we're here, we need a new block for our directory
+  ret = add_block(dir_oi);  // Since new blocks are zero'd out, they will 
+                            //  "empty" directory entries
+
+  if (ret < 0)
+    return ERR_PTR(ret);
+
+  // Account for this new block, and return the first entry in it
+  dir_oi->size += OSPFS_BLKSIZE;
+
+  return ((ospfs_direntry_t *) ospfs_inode_data(dir_oi, off));
+  /* END MY CODE */
 }
 
 // ospfs_link(src_dentry, dir, dst_dentry
@@ -1080,8 +1160,63 @@ ospfs_create(struct inode *dir, struct dentry *dentry, int mode, struct nameidat
 {
 	ospfs_inode_t *dir_oi = ospfs_inode(dir->i_ino);
 	uint32_t entry_ino = 0;
+  ospfs_direntry_t *new_entry = NULL;
+  ospfs_inode_t *new_inode;
+  int ii;
+
 	/* EXERCISE: Your code here. */
-	return -EINVAL; // Replace this line
+  // If the name's too long, throw ENAMETOOLONG
+  if (dentry->d_name.len > OSPFS_MAXNAMELEN)
+    return -ENAMETOOLONG;
+
+  // If the file's already there, throw EEXIST
+  if (!(find_direntry(dir_oi, dentry->d_name.name, dentry->d_name.len)))
+  {
+    return -EEXIST;
+  }
+
+  // Find/create a blank directory entry, fail if there's a problem with that
+  if (IS_ERR((new_entry = create_blank_direntry(dir_oi))))
+  {
+    return PTR_ERR(new_entry);
+  }
+
+  // Find an empty inode
+  for (entry_ino = 1; entry_ino < ospfs_super->os_ninodes)
+  {
+    if (osprd_inode(entry_ino)->oi_nlink == 0)
+    {
+      break; // found one!
+    }
+  }
+
+  // If we looked through all the inodes w/o finding anything, throw ENOSPC
+  if (entry_ino == ospfs_super->os_ninodes)
+  {
+    return -ENOSPC;
+  }
+
+  new_inode = osprd_inode(entry_ino);
+
+  // Populate the ospfs_inode
+  new_inode->oi_size = 0;
+  new_inode->oi_ftype = OSPFS_FTYPE_REG;
+  new_inode->oi_nlink = 1;
+  new_inode->oi_mode= mode;
+  for (ii = 0; ii < OSPFS_NDIRECT; ii++)
+  {
+    new_inode->oi_direct[ii] = 0;
+  }
+  new_inode->oi_indirect = 0;
+  new_inode->oi_indirect2 = 0;
+
+  // Populate the new directory entry
+  new_entry->od_ino = entry_ino;
+  memcpy(new_entry->od_name, dentry->d_name.name, dentry->d_name.len);
+  *(new_entry->od_name + d_entry->d_name.len) = '\0';  // NULL terminate
+
+  /* END MY CODE */
+
 
 	/* Execute this code after your function has successfully created the
 	   file.  Set entry_ino to the created file's inode number before
