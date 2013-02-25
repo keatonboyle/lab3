@@ -649,36 +649,11 @@ free_block(uint32_t blockno)
 //
 // EXERCISE: Fill in this function.
 
-static int32_t
+/*static int32_t
 indir2_index(uint32_t b)
 {
-  /* START Curls code */
-  /*ospfs_inode_t *node;
-  int i;
-  for(i = 0; i < ospfs_super->os_ninodes; i++)
-  {
-    if(bitvector_test(&ospfs_data[OSPFS_BLKSIZE * 2], i+ospfs->os_firstinob) == 1)
-      continue;
-    node = ospfs_inode(i);
-    if(node->oi_indirect2 != 0)
-    {
-      uint32_t *indirect2 = ospfs_block(node->oi_indirect2);
-      int j;
-      for(j = 0; j < OSPFS_NINDIRECT; j++)
-      {
-        if(indirect2[j] == 0)
-          continue;
-        uint32_t *indirect = opsfs_block(indirect2[j]);
-        int k;
-        for(k = 0; k < OSPFS_NINDIRECT; k++)
-         if(indirect[k] == b)
-           return node->oi_indirect2; // I feel like the return value should be the doubly block index
-      }
-    }
-  }*/
-  /* END Curls code */
 	return -1;
-}
+}*/
 
 
 // int32_t indir_index(uint32_t b)
@@ -692,45 +667,11 @@ indir2_index(uint32_t b)
 //
 // EXERCISE: Fill in this function.
 
-static int32_t
+/*static int32_t
 indir_index(uint32_t b)
 {
-  /* START Curls code */
-  /*uint32_t doub;
-  ospfs_inode_t *node;
-  int i;
-  
-	if((doub = indir2_index(b)) != -1)
-  {
-    //return the index of indirect within doubly
-    uint32_t *indirect2 = ospfs_block(doub);
-    for(i = 0; i < OSPFS_NINDIRECT; i++)
-    {
-      if(indirect2[i] == 0)
-        continue;
-      uint32_t *indirect = ospfs_block(indirect2[i]);
-      int j;
-      for(j = 0; j < OSPFS_NINDIRECT; j++)
-        if(indirect[j] == b)
-          return indirect2[i];
-    }
-  }
-  for(i = 0; i < ospfs_super->os_ninodes; i++)
-  {
-    if(bitvector_test(&ospfs_data[OSPFS_BLKSIZE * 2], i+ospfs->os_firstinob) == 1)
-      continue;
-    node = ospfs_inode(i);
-    if(node->oi_indirect == 0)
-      continue;
-    uint32_t *indirect = opsfs_block(node->oi_indirect);
-    int j;
-    for(j = 0; j < OSPFS_NINDIRECT; j++)
-      if(indirect[j] == b)
-        return 0;
-  }*/
-  /* END Curls code */
 	return -1;
-}
+}*/
 
 
 // int32_t indir_index(uint32_t b)
@@ -742,79 +683,11 @@ indir_index(uint32_t b)
 //
 // EXERCISE: Fill in this function.
 
-static int32_t
+/*static int32_t
 direct_index(uint32_t b)
 {
-  /* START Curls code */
-  /*uint32_t doub;
-  uint32_t ind;
-  int i;
-  ospfs_inode_t *node;
-  switch((ind = indir_index(b)))
-  {
-    case 0:  // It's in a regular indirect block
-    {
-      for(i = 0; i < ospfs_super->os_ninodes; i++)
-      {
-        if(bitvector_test(&ospfs_data[OSPFS_BLKSIZE * 2], i+ospfs->os_firstinob) == 1)
-          continue;
-        node = ospfs_inode(i);
-        if(node->oi_indirect == 0)
-          continue;
-        uint32_t *indirect = opsfs_block(node->oi_indirect);
-        int j;
-        for(j = 0; j < OSPFS_NINDIRECT; j++)
-          if(indirect[j] == b)
-            return j;
-      }
-      break;
-    }
-    case -1: // It's in a direct block
-    {
-       for(i = 0; i < ospfs_super->os_ninodes; i++)
-       {
-        if(bitvector_test(&ospfs_data[OSPFS_BLKSIZE * 2], i+ospfs->os_firstinob) == 1)
-          continue;
-        node = ospfs_inode(i);
-        if(node->oi_direct == 0)
-          continue;
-        uint32_t *direct = opsfs_block(node->oi_direct);
-        int j;
-        for(j = 0; j < OSPFS_NDIRECT; j++)
-          if(indirect[j] == b)
-            return j; 
-       }
-      break;
-    }
-    default:  // It was in a doubly
-    {
-      for(i = 0; i < ospfs_super->os_ninodes; i++)
-      {
-        if(bitvector_test(&ospfs_data[OSPFS_BLKSIZE * 2], i+ospfs->os_firstinob) == 1)
-          continue;
-        node = ospfs_inode(i);
-        if(node->oi_indirect2 != 0)
-        {
-          uint32_t *indirect2 = ospfs_block(node->oi_indirect2);
-          int j;
-          for(j = 0; j < OSPFS_NINDIRECT; j++)
-          {
-            if(indirect2[j] == 0)
-              continue;
-            uint32_t *indirect = opsfs_block(indirect2[j]);
-            int k;
-            for(k = 0; k < OSPFS_NINDIRECT; k++)
-            if(indirect[k] == b)
-              return k;
-          }
-        }
-      }      
-      break;
-    }
-  }*/
-  /* END Curls code */
 	return -1;
-}
+}*/
 
 
 // add_block(ospfs_inode_t *oi)
