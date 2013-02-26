@@ -1340,9 +1340,8 @@ ospfs_create(struct inode *dir, struct dentry *dentry, int mode, struct nameidat
     return -ENAMETOOLONG;
 
   // If the file's already there, throw EEXIST
-  if (!(find_direntry(dir_oi, dentry->d_name.name, dentry->d_name.len)))
+  if (find_direntry(dir_oi, dentry->d_name.name, dentry->d_name.len))
   {
-    //eprintk("found 'em!\n");
     return -EEXIST;
   }
 
@@ -1383,8 +1382,10 @@ ospfs_create(struct inode *dir, struct dentry *dentry, int mode, struct nameidat
 
   // Populate the new directory entry
   new_entry->od_ino = entry_ino;
+  //eprintk("new ino num: %d\n", entry_ino);
   memcpy(new_entry->od_name, dentry->d_name.name, dentry->d_name.len);
   *(new_entry->od_name + dentry->d_name.len) = '\0';  // NULL terminate
+  //eprintk("new file name: %s\n", new_entry->od_name);
 
   /* END MY CODE */
 
