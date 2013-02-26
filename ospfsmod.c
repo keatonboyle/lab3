@@ -1147,7 +1147,7 @@ ospfs_write(struct file *filp, const char __user *buffer, size_t count, loff_t *
   if(append != 0)
   {
     if((max_size - oi->oi_size) < count){
-      temp = change_size(max_size+count)
+      temp = change_size(oi,max_size+count);
       if(temp < 0)
         return temp;
     }
@@ -1155,7 +1155,7 @@ ospfs_write(struct file *filp, const char __user *buffer, size_t count, loff_t *
   else
   {
     if(max_size < count){
-      temp = change_size(max_size+count);
+      temp = change_size(oi,max_size+count);
       if(temp < 0)
         return temp;
     }
