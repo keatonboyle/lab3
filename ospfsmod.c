@@ -1159,14 +1159,14 @@ ospfs_write(struct file *filp, const char __user *buffer, size_t count, loff_t *
 	// size to accomodate the request.  (Use change_size().)
 	/* EXERCISE: Your code here */
   int temp;
-  uint32_t max_size = ospfs_size2nblocks(oi->oi_size)*OSPFS_BLKSIZE;
+  uint32_t curr_blocks = ospfs_size2nblocks(oi->oi_size);
   //eprintk("size of file %d\n",oi->oi_size);
   //eprintk("position %d\n",*f_pos);
   //eprintk("the buffer %s",buffer);
   if(append != 0)
   {
     //eprintk("It wants to append!\n");
-    *f_pos = oi->oi_size;
+    *f_pos = oi->oi_size - ((curr_blocks-1)*OSPFS_BLKSIZE);
     temp = change_size(oi,count + oi->oi_size);
     if(temp < 0)
       return temp;
