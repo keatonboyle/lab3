@@ -1160,22 +1160,27 @@ ospfs_write(struct file *filp, const char __user *buffer, size_t count, loff_t *
 	/* EXERCISE: Your code here */
   int temp;
   uint32_t max_size = ospfs_size2nblocks(oi->oi_size)*OSPFS_BLKSIZE;
+  //eprintk("size of file %d\n",oi->oi_size);
+  //eprintk("position %d\n",*f_pos);
   if(append != 0)
   {
-    if((max_size - oi->oi_size) < count){
-      temp = change_size(oi,max_size+count);
+    //eprintk("It wants to append!\n");
+    *f_pos = oi->oi_size;
+    //if((max_size - oi->oi_size) < count){
+      temp = change_size(oi,count + oi->oi_size);
       if(temp < 0)
         return temp;
-    }
+    //}
+    
   }
   else
   {
-    if(max_size < count){
-      temp = change_size(oi,max_size+count);
-      if(temp < 0)
-        return temp;
-    }
+    temp = change_size(oi,count);
+    if(temp < 0)
+      return temp;
   }
+  //eprintk("new size of file %d\n",oi->oi_size);
+  //eprintk("new position %d\n",*f_pos);
   /*END EXERCISE*/
 
 	// Copy data block by block
