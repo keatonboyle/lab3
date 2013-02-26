@@ -498,17 +498,33 @@ ospfs_dir_readdir(struct file *filp, void *dirent, filldir_t filldir)
     /* TODO: am I sure about the -2 on the end here?  -------v  */
     od = (ospfs_direntry_t *) ospfs_inode_data(dir_oi, f_pos-2);
 
+    /*
+    char *odi = (char *) od;
+    for ( ; odi < ((char *) od) + 256; odi++)
+      eprintk("%02x   %c\n | ", *odi, *odi);
+      */
+
     if (od->od_ino == 0)  // Skipped entry
     {
+      //eprintk("Skipping dir entry\n");
       f_pos += OSPFS_DIRENTRY_SIZE;
       continue;
     }
 
     entry_oi = ospfs_inode(od->od_ino);  // inode of the entry
 
-    ok_so_far = filldir(od, od->od_name, 
+    /*
+    eprintk("directory entry for inode %d\n", od->od_ino);
+    eprintk("name: %s\n", od->od_name);
+    eprintk("len: %d\n", strnlen(od->od_name, OSPFS_MAXNAMELEN));
+    */
+
+    ok_so_far = filldir(dirent, od->od_name, 
                         strnlen(od->od_name, OSPFS_MAXNAMELEN),
-                        f_pos, od->od_ino, entry_oi->oi_ftype);
+                        f_pos-2, od->od_ino, 
+                        entry_oi->oi_ftype);
+
+    //eprintk("oksofar: %d\n", ok_so_far);
 
     if (ok_so_far >= 0)
     {
