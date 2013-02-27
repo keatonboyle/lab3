@@ -1168,7 +1168,8 @@ ospfs_write(struct file *filp, const char __user *buffer, size_t count, loff_t *
   {
     //eprintk("It wants to append!\n");
     *f_pos = oi->oi_size;
-    my_offset = oi->oi_size - ((curr_blocks-1)*OSPFS_BLKSIZE);
+    if(oi->oi_size % OSPFS_BLKSIZE != 0)
+      my_offset = oi->oi_size - ((curr_blocks-1)*OSPFS_BLKSIZE);
     temp = change_size(oi,count + oi->oi_size);
     if(temp < 0)
       return temp;
