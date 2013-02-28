@@ -331,6 +331,7 @@ ospfs_get_sb(struct file_system_type *fs_type, int flags, const char *dev_name, 
 static int
 ospfs_delete_dentry(struct dentry *dentry)
 {
+  logEntry("ospfs_delete_dentry");
 	return 1;
 }
 
@@ -615,10 +616,10 @@ ospfs_unlink(struct inode *dirino, struct dentry *dentry)
 static uint32_t
 allocate_block(void)
 {
-  logEntry("allocate_block");
 	/* EXERCISE: Your code here */
-  uint32_t i;
   int length_bits = (ospfs_super->os_firstinob - 2) * OSPFS_BLKBITSIZE;
+  uint32_t i;
+  logEntry("allocate_block");
   for(i = 0; i < length_bits; i++)
   {
     if(bitvector_test(&ospfs_data[OSPFS_BLKSIZE * 2], i) == 1)
@@ -758,7 +759,6 @@ direct_index(uint32_t b)
 static int
 add_block(ospfs_inode_t *oi)
 {
-  logEntry("add_block");
 	// current number of blocks in file
 	uint32_t n = ospfs_size2nblocks(oi->oi_size);
 
@@ -768,6 +768,8 @@ add_block(ospfs_inode_t *oi)
 	/* EXERCISE: Your code here */
   uint32_t allo_block;
   char *my_block; // Is this the right type?
+  
+  logEntry("add_block");
   
   if(n < OSPFS_NDIRECT)
   {
@@ -782,6 +784,7 @@ add_block(ospfs_inode_t *oi)
   }
   else if(n < OSPFS_NDIRECT + OSPFS_NINDIRECT)
   {
+    uint32_t *indirect;
     if(n == OSPFS_NDIRECT)
     {
       allo_block = allocate_block();
@@ -797,7 +800,7 @@ add_block(ospfs_inode_t *oi)
         free_block(allocated[0][0]); // Not sure if I should set oi_indirect to zero also
       return -ENOSPC;
     }
-    uint32_t *indirect = ospfs_block(oi->oi_indirect);
+    indirect = ospfs_block(oi->oi_indirect);
     indirect[n - OSPFS_NDIRECT] = allo_block;
     oi->oi_size = (n+1)*OSPFS_BLKSIZE;
     my_block = ospfs_block(allo_block);
@@ -806,6 +809,7 @@ add_block(ospfs_inode_t *oi)
   }
   else if(n < OSPFS_MAXFILEBLKS)
   {
+    uint32_t *indirect2;
     if(n == OSPFS_NDIRECT + OSPFS_NINDIRECT)
     {
       allo_block = allocate_block();
@@ -815,7 +819,7 @@ add_block(ospfs_inode_t *oi)
       allocated[0] = &oi->oi_indirect2;
     }
     
-    uint32_t *indirect2 = (uint32_t *)ospfs_block(oi->oi_indirect2);
+    indirect2 = (uint32_t *)ospfs_block(oi->oi_indirect2);
     int index2 = (n - OSPFS_NDIRECT - OSPFS_NINDIRECT) / OSPFS_NINDIRECT;
     if(((n - OSPFS_NDIRECT - OSPFS_NINDIRECT) % OSPFS_NINDIRECT) == 0)
     {
@@ -972,11 +976,11 @@ remove_block(ospfs_inode_t *oi)
 static int
 change_size(ospfs_inode_t *oi, uint32_t new_size)
 {
-  logEntry("change_size");
   uint32_t n = ospfs_size2nblocks(new_size);
 	uint32_t old_size = oi->oi_size;
 	int r = 0;
   int grow_count = 0;
+  logEntry("change_size");
 
 	while (ospfs_size2nblocks(oi->oi_size) < n) {
 	        /* Grow File */
@@ -1144,7 +1148,6 @@ ospfs_read(struct file *filp, char __user *buffer, size_t count, loff_t *f_pos)
 static ssize_t
 ospfs_write(struct file *filp, const char __user *buffer, size_t count, loff_t *f_pos)
 {
-  logEntry("ospfs_write");
 	ospfs_inode_t *oi = ospfs_inode(filp->f_dentry->d_inode->i_ino);
 	int retval = 0;
 	size_t amount = 0; // amount of data written
@@ -1164,6 +1167,7 @@ ospfs_write(struct file *filp, const char __user *buffer, size_t count, loff_t *
   //eprintk("size of file %d\n",oi->oi_size);
   //eprintk("position %d\n",*f_pos);
   //eprintk("the buffer %s",buffer);
+  logEntry("ospfs_write");
   if(append != 0)
   {
     //eprintk("It wants to append!\n");
@@ -1327,7 +1331,8 @@ create_blank_direntry(ospfs_inode_t *dir_oi)
     return ERR_PTR(ret);
 
   // Account for this new block, and return the first entry in it
-  dir_oi->oi_size += OSPFS_BLKSIZE;
+    //Note that add_block already changes the size
+  //dir_oi->oi_size += OSPFS_BLKSIZE;
 
   return ((ospfs_direntry_t *) ospfs_inode_data(dir_oi, off));
   /* END MY CODE */
