@@ -1391,6 +1391,8 @@ ospfs_link(struct dentry *src_dentry, struct inode *dir, struct dentry *dst_dent
   // Populate the new directory entry
   new_entry->od_ino = src_dentry->d_inode->i_ino;
   
+  dir_oi->oi_nlink++;
+  
   memcpy(new_entry->od_name, dst_dentry->d_name.name, dst_dentry->d_name.len);
   *(new_entry->od_name + dst_dentry->d_name.len) = '\0';  // NULL terminate  
   
@@ -1532,12 +1534,61 @@ ospfs_create(struct inode *dir, struct dentry *dentry, int mode, struct nameidat
 static int
 ospfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname)
 {
-  logEntry("ospfs_symlink");
 	ospfs_inode_t *dir_oi = ospfs_inode(dir->i_ino);
 	uint32_t entry_ino = 0;
+  ospfs_direntry_t *new_entry = NULL;
+  ospfs_symlink_inode_t *new_inode;
+  int ii;
+  int counter = 0;
+  logEntry("ospfs_symlink");
 
 	/* EXERCISE: Your code here. */
-	return -EINVAL;
+  if (dentry->d_name.len > OSPFS_MAXNAMELEN)
+    return -ENAMETOOLONG;
+  
+  if (find_direntry(dir_oi, dentry->d_name.name, dentry->d_name.len))
+    return -EEXIST;
+  
+  for(ii=0; symname[ii] != '\0'; ii++){
+    counter++;
+  }
+  
+  if(counter > OSPFS_MAXSYMLINKLEN)
+    return -ENAMETOOLONG;
+  
+  // Find an empty inode
+  for (entry_ino = 1; entry_ino < ospfs_super->os_ninodes; entry_ino++)
+  {
+    if (ospfs_inode(entry_ino)->oi_nlink == 0)
+    {
+      break; // found one!
+    }
+  }
+
+  // If we looked through all the inodes w/o finding anything, throw ENOSPC
+  if (entry_ino == ospfs_super->os_ninodes)
+  {
+    return -ENOSPC;
+  }
+
+  new_inode =(ospfs_symlink_inode_t *) ospfs_inode(entry_ino);
+
+  // Populate the ospfs_symlink_inode
+  new_inode->oi_size = counter;
+  new_inode->oi_ftype = OSPFS_FTYPE_SYMLINK;
+  new_inode->oi_nlink = 1;
+
+  // Populate the new directory entry
+  new_entry->od_ino = entry_ino;
+  
+  memcpy(new_entry->od_name, dentry->d_name.name, dentry->d_name.len);
+  *(new_entry->od_name + dentry->d_name.len) = '\0';  // NULL terminate
+  
+  for(ii = 0; ii <= counter; ii++){
+    new_inode->oi_symlink[ii] = symname[ii];
+  }
+  
+  /*END EXERCISE*/
 
 	/* Execute this code after your function has successfully created the
 	   file.  Set entry_ino to the created file's inode number before
