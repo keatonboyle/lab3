@@ -1165,11 +1165,9 @@ ospfs_write(struct file *filp, const char __user *buffer, size_t count, loff_t *
   uint32_t curr_blocks = ospfs_size2nblocks(oi->oi_size);
   uint32_t curr_blockno;
   int my_offset = 0;
-  //eprintk("size of file %d\n",oi->oi_size);
   //eprintk("start position %d\n",*f_pos);
   //eprintk("the buffer %s",buffer);
   logEntry("ospfs_write");
-  //eprintk("count1 %d\n",count);
   if(oi->oi_size == 0)
   {
     temp = change_size(oi,count);
