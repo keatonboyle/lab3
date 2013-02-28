@@ -99,6 +99,7 @@ static struct inode_operations ospfs_symlink_inode_ops;
 static struct dentry_operations ospfs_dentry_ops;
 static struct super_operations ospfs_superblock_ops;
 
+static void __exit exit_ospfs_fs(void);
 
 
 /*****************************************************************************
@@ -1583,7 +1584,17 @@ ospfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname)
     return -ENOSPC;
   }
 
-  new_inode =(ospfs_symlink_inode_t *) ospfs_inode(entry_ino);
+  new_inode = (ospfs_symlink_inode_t *) ospfs_inode(entry_ino);
+
+//  eprintk("Inum: %d\n", entry_ino);
+
+  if (!new_inode) 
+  {
+    eprintk("null new_inode\n");
+    exit_ospfs_fs();
+  }
+
+  new_entry = create_blank_direntry(dir_oi);
 
   // Populate the ospfs_symlink_inode
   new_inode->oi_size = counter;
@@ -1595,6 +1606,7 @@ ospfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname)
   
   memcpy(new_entry->od_name, dentry->d_name.name, dentry->d_name.len);
   *(new_entry->od_name + dentry->d_name.len) = '\0';  // NULL terminate
+//  eprintk("od_name: %s\n", new_entry->od_name);
   
   for(ii = 0; ii <= counter; ii++){
     new_inode->oi_symlink[ii] = symname[ii];
@@ -1632,8 +1644,12 @@ static void *
 ospfs_follow_link(struct dentry *dentry, struct nameidata *nd)
 {
   logEntry("ospfs_follow_link");
+  int ii;
+  char *start = "root?";
 	ospfs_symlink_inode_t *oi =
 		(ospfs_symlink_inode_t *) ospfs_inode(dentry->d_inode->i_ino);
+
+
 	// Exercise: Your code here.
 
 	nd_set_link(nd, oi->oi_symlink);
