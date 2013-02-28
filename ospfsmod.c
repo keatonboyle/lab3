@@ -1344,7 +1344,7 @@ create_blank_direntry(ospfs_inode_t *dir_oi)
 //
 //   Inputs: src_dentry   -- a pointer to the dentry for the source file.  This
 //                           file's inode contains the real data for the hard
-//                           linked filae.  The important elements are:
+//                           linked file.  The important elements are:
 //                             src_dentry->d_name.name
 //                             src_dentry->d_name.len
 //                             src_dentry->d_inode->i_ino
@@ -1369,9 +1369,34 @@ create_blank_direntry(ospfs_inode_t *dir_oi)
 
 static int
 ospfs_link(struct dentry *src_dentry, struct inode *dir, struct dentry *dst_dentry) {
+  /* EXERCISE: Your code here. */
+  
+  ospfs_direntry_t *new_entry = NULL;
+  ospfs_inode_t *dir_oi = ospfs_inode(dir->i_ino);
+  
   logEntry("ospfs_link");
-	/* EXERCISE: Your code here. */
-	return -EINVAL;
+	
+  if (dst_dentry->d_name.len > OSPFS_MAXNAMELEN)
+    return -ENAMETOOLONG;
+  
+  if (find_direntry(dir_oi, dst_dentry->d_name.name, dst_dentry->d_name.len))
+    return -EEXIST;
+  
+  // Find/create a blank directory entry, fail if there's a problem with that
+  if (IS_ERR((new_entry = create_blank_direntry(dir_oi))))
+  {
+    return PTR_ERR(new_entry);
+  }
+
+  // Populate the new directory entry
+  new_entry->od_ino = src_dentry->d_inode->i_ino;
+  
+  memcpy(new_entry->od_name, dst_dentry->d_name.name, dst_dentry->d_name.len);
+  *(new_entry->od_name + dst_dentry->d_name.len) = '\0';  // NULL terminate  
+  
+  /* END EXERCISE */
+  
+	return 0;
 }
 
 // ospfs_create
