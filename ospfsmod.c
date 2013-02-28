@@ -16,7 +16,7 @@
 #include <linux/sched.h>
 
 
-#define DEBUG_FS 1
+#define DEBUG_FS 0
 
 /****************************************************************************
  * ospfsmod
@@ -1163,14 +1163,25 @@ ospfs_write(struct file *filp, const char __user *buffer, size_t count, loff_t *
 	/* EXERCISE: Your code here */
   int temp;
   uint32_t curr_blocks = ospfs_size2nblocks(oi->oi_size);
+  uint32_t curr_blockno;
   int my_offset = 0;
   //eprintk("size of file %d\n",oi->oi_size);
-  //eprintk("position %d\n",*f_pos);
+  //eprintk("start position %d\n",*f_pos);
   //eprintk("the buffer %s",buffer);
   logEntry("ospfs_write");
-  if(append != 0)
+  //eprintk("count1 %d\n",count);
+  if(oi->oi_size == 0)
+  {
+    temp = change_size(oi,count);
+    if(temp < 0)
+      return temp;
+  }
+  else if(append != 0 || (*f_pos >= oi->oi_size))
   {
     //eprintk("It wants to append!\n");
+    if(oi->oi_size == OSPFS_MAXFILESIZE)
+      goto done;
+    
     *f_pos = oi->oi_size;
     if(oi->oi_size % OSPFS_BLKSIZE != 0)
       my_offset = oi->oi_size - ((curr_blocks-1)*OSPFS_BLKSIZE);
@@ -1178,14 +1189,13 @@ ospfs_write(struct file *filp, const char __user *buffer, size_t count, loff_t *
     if(temp < 0)
       return temp;
   }
-  else
-  {
-    temp = change_size(oi,count);
-    if(temp < 0)
-      return temp;
+  else {
+    curr_blockno = ospfs_size2nblocks(*f_pos+1);
+    my_offset = *f_pos - (curr_blockno - 1)*OSPFS_BLKSIZE;
   }
   //eprintk("new size of file %d\n",oi->oi_size);
   //eprintk("new position %d\n",*f_pos);
+  //eprintk("offset %d\n", my_offset);
   /*END EXERCISE*/
 
 	// Copy data block by block
@@ -1193,12 +1203,12 @@ ospfs_write(struct file *filp, const char __user *buffer, size_t count, loff_t *
 		uint32_t blockno = ospfs_inode_blockno(oi, *f_pos);
 		uint32_t n;
 		char *data;
-
+    
 		if (blockno == 0) {
+      //eprintk("WHAT THE HECK\n");
 			retval = -EIO;
 			goto done;
 		}
-    
 		data = ospfs_block(blockno);
 
 		// Figure out how much data is left in this block to write.
@@ -1206,8 +1216,7 @@ ospfs_write(struct file *filp, const char __user *buffer, size_t count, loff_t *
 		// read user space.
 		// Keep track of the number of bytes moved in 'n'.
 		/* EXERCISE: Your code here */
-    if(append != 0){
-      append = 0;
+    if(my_offset != 0){
       if((count+my_offset) > OSPFS_BLKSIZE){
         n = OSPFS_BLKSIZE - my_offset;
       }
@@ -1219,6 +1228,11 @@ ospfs_write(struct file *filp, const char __user *buffer, size_t count, loff_t *
     }
     else
       n = OSPFS_BLKSIZE;
+    //eprintk("block %d\n",blockno);
+    //eprintk("end f_pos %d\n", *f_pos);
+    //eprintk("offset %d\n", my_offset);
+    //eprintk("n %d\n",n);
+    //eprintk("count %d\n",count);
 		if(copy_from_user(data+my_offset,buffer,n)){
       retval = -EFAULT;
       goto done;
