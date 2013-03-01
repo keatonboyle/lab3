@@ -1379,7 +1379,8 @@ ospfs_link(struct dentry *src_dentry, struct inode *dir, struct dentry *dst_dent
   // Populate the new directory entry
   new_entry->od_ino = src_dentry->d_inode->i_ino;
   
-  dir_oi->oi_nlink++;
+  ospfs_inode_t *oi = ospfs_inode(src_dentry->d_inode->i_ino);
+  oi->oi_nlink++;
   
   memcpy(new_entry->od_name, dst_dentry->d_name.name, dst_dentry->d_name.len);
   *(new_entry->od_name + dst_dentry->d_name.len) = '\0';  // NULL terminate  
