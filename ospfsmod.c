@@ -565,11 +565,11 @@ ospfs_dir_readdir(struct file *filp, void *dirent, filldir_t filldir)
 static int
 ospfs_unlink(struct inode *dirino, struct dentry *dentry)
 {
-  logEntry("ospfs_unlink");
 	ospfs_inode_t *oi = ospfs_inode(dentry->d_inode->i_ino);
 	ospfs_inode_t *dir_oi = ospfs_inode(dentry->d_parent->d_inode->i_ino);
 	int entry_off;
 	ospfs_direntry_t *od;
+  logEntry("ospfs_unlink");
 
 	od = NULL; // silence compiler warning; entry_off indicates when !od
 	for (entry_off = 0; entry_off < dir_oi->oi_size;
@@ -800,7 +800,10 @@ add_block(ospfs_inode_t *oi)
     if(allo_block == 0)
     {
       if(allocated[0])
-        free_block(allocated[0][0]); // Not sure if I should set oi_indirect to zero also
+      {
+        free_block(*(allocated[0]));
+        *(allocated[0]) = 0;
+      }
       return -ENOSPC;
     }
     indirect = ospfs_block(oi->oi_indirect);
@@ -829,8 +832,10 @@ add_block(ospfs_inode_t *oi)
       allo_block = allocate_block();
       if(allo_block == 0)
       {
-        if(allocated[0])
-          free_block(allocated[0][0]);
+        if(allocated[0]){
+          free_block(*(allocated[0]));
+          *(allocated[0]) = 0;
+        }
         return -ENOSPC;
       }
       indirect2[index2] = allo_block;
@@ -840,10 +845,14 @@ add_block(ospfs_inode_t *oi)
     allo_block = allocate_block();
     if(allo_block == 0)
     {
-      if(allocated[0])
-        free_block(allocated[0][0]);
-      if(allocated[1])
-        free_block(allocated[1][0]);
+      if(allocated[0]){
+        free_block(*(allocated[0]));
+        *(allocated[0]) = 0;
+      }
+      if(allocated[1]){
+        free_block(*(allocated[1]));
+        *(allocated[1]) = 0;
+      }
       return -ENOSPC;
     }
     uint32_t *indirect = (uint32_t *)ospfs_block(indirect2[index2]);

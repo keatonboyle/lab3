@@ -11,13 +11,13 @@
 # information you'd like us to know, please add it at the end of the file.
 
 # Partner 1
-Name: 
-Student ID: 
-Email: 
+Name: Keaton Boyle
+Student ID: 103-882-791
+Email: keatonboyle@gmail.com
 
 # Partner 2 (if you're working in a team)
 Name: Anthony Ortega
-Student ID: 503953545
+Student ID: 503-953-545
 Email: anthony.ortega@ucla.edu
 
 # Extra credit problems
