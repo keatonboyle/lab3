@@ -16,11 +16,13 @@ Student ID:
 Email: 
 
 # Partner 2 (if you're working in a team)
-Name: 
-Student ID: 
-Email: 
+Name: Anthony Ortega
+Student ID: 503953545
+Email: anthony.ortega@ucla.edu
 
 # Extra credit problems
 #Extra credit problem: none
 
 # Add any other information you'd like us to know below this line.
+
+We did not have any need for the 3 indexing functions.
