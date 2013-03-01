@@ -15,8 +15,6 @@
 #include <linux/kernel.h>
 #include <linux/sched.h>
 
-#define false 0
-#define true 1
 
 #define DEBUG_FS 0
 
@@ -1540,9 +1538,7 @@ ospfs_create(struct inode *dir, struct dentry *dentry, int mode, struct nameidat
 //               -EIO          on I/O error.
 //
 //   EXERCISE: Complete this function.
-/* This function will also reformat conditional symlinks
- *       root?/path1:/path/2\0   to --->  root?/path1\0/path/2\0
- */
+
 static int
 ospfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname)
 {
@@ -1552,8 +1548,6 @@ ospfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname)
   ospfs_symlink_inode_t *new_inode;
   int ii;
   int counter = 0;
-  int isCond = true;
-  char *condToken = "root?";
   logEntry("ospfs_symlink");
 
 	/* EXERCISE: Your code here. */
@@ -1609,36 +1603,8 @@ ospfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname)
   *(new_entry->od_name + dentry->d_name.len) = '\0';  // NULL terminate
 //  eprintk("od_name: %s\n", new_entry->od_name);
   
-  if (strlen(symname) > OSPFS_MAXSYMLINKLEN)
-  {
-    return -ENAMETOOLONG;
-  }
-
-  strncpy(new_inode->oi_symlink, symname, OSPFS_MAXSYMLINKLEN);
-
-  for (ii = 0; ii < 5; ii++)
-  {
-    if (condToken[ii] != new_inode->oi_symlink[ii])
-    {
-      isCond = false;
-      break;
-    }
-  }
-
-  if (isCond)
-  {
-    for( ; new_inode->oi_symlink[ii] != '\0'; ii++)
-    {
-      if(new_inode->oi_symlink[ii] ==':') 
-      {
-        new_inode->oi_symlink[ii] = '\0';
-        break;
-      }
-    }
-    /*
-    eprintk("first part is: %s\n", new_inode->oi_symlink);
-    eprintk("last part is: %s\n",  new_inode->oi_symlink+ii+1);
-    */
+  for(ii = 0; ii <= counter; ii++){
+    new_inode->oi_symlink[ii] = symname[ii];
   }
   
   /*END EXERCISE*/
@@ -1668,57 +1634,20 @@ ospfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname)
 //     root?/path/1:/path/2.
 //   (hint: Should the given form be changed in any way to make this method
 //   easier?  With which character do most functions expect C strings to end?)
-//
-//   
 
 static void *
 ospfs_follow_link(struct dentry *dentry, struct nameidata *nd)
 {
   logEntry("ospfs_follow_link");
-	// Exercise: Your code here.
   int ii;
-  char *condToken = "root?";
-  int isCond = true;
-  char *forRoot = NULL;
-  char *forNotRoot = NULL;
+  char *start = "root?";
 	ospfs_symlink_inode_t *oi =
 		(ospfs_symlink_inode_t *) ospfs_inode(dentry->d_inode->i_ino);
 
-  for (ii = 0; ii < 5; ii++)
-  {
-    if (condToken[ii] != oi->oi_symlink[ii])
-    {
-      isCond = false;
-      break;
-    }
-  }
 
-  if (isCond)
-  {
-    forRoot = oi->oi_symlink+ii;
-    for( ; oi->oi_symlink[ii] != '\0'; ii++) {}
-    forNotRoot = oi->oi_symlink+ii+1;
+	// Exercise: Your code here.
 
-    if(current->uid == 0)
-    {
-  /*    eprintk("Root!\n");
-      eprintk("Setting with: %s\n", forRoot);*/
-      nd_set_link(nd, forRoot);
-    }
-    else
-    {
-    /*  eprintk("Not Root!\n");
-      eprintk("Setting with: %s\n", forNotRoot);*/
-      nd_set_link(nd, forNotRoot);
-    }
-  }
-  else
-  {
-    nd_set_link(nd, oi->oi_symlink);
-  }
-
-  /* END EXERCISE */
-
+	nd_set_link(nd, oi->oi_symlink);
 	return (void *) 0;
 }
 
