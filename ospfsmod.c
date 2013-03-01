@@ -1153,45 +1153,32 @@ ospfs_write(struct file *filp, const char __user *buffer, size_t count, loff_t *
 	// Support files opened with the O_APPEND flag.  To detect O_APPEND,
 	// use struct file's f_flags field and the O_APPEND bit.
 	/* EXERCISE: Your code here */
-  int append = (filp->f_flags & O_APPEND) != 0;
+  if((filp->f_flags & O_APPEND) != 0){
+    *f_pos = oi->oi_size;
+  }
   /* END OF EXERCISE */
 
 	// If the user is writing past the end of the file, change the file's
 	// size to accomodate the request.  (Use change_size().)
 	/* EXERCISE: Your code here */
   int temp;
-  uint32_t curr_blocks = ospfs_size2nblocks(oi->oi_size);
-  uint32_t curr_blockno;
-  int my_offset = 0;
-  //eprintk("start position %d\n",*f_pos);
-  //eprintk("the buffer %s",buffer);
+  
   logEntry("ospfs_write");
-  if(oi->oi_size == 0)
-  {
-    temp = change_size(oi,count);
-    if(temp < 0)
-      return temp;
-  }
-  else if(append != 0 || (*f_pos >= oi->oi_size))
-  {
-    //eprintk("It wants to append!\n");
-    if(oi->oi_size == OSPFS_MAXFILESIZE)
+  
+  if((*f_pos + count) >= OSPFS_MAXFILESIZE){
+    count = OSPFS_MAXFILESIZE - *f_pos;
+    if(count == 0){
+      retval = -ENOSPC;
       goto done;
-    
-    *f_pos = oi->oi_size;
-    if(oi->oi_size % OSPFS_BLKSIZE != 0)
-      my_offset = oi->oi_size - ((curr_blocks-1)*OSPFS_BLKSIZE);
-    temp = change_size(oi,count + oi->oi_size);
+    }
+  }
+  
+  if((*f_pos + count) > oi->oi_size)
+  {
+    temp = change_size(oi,count + *f_pos);
     if(temp < 0)
       return temp;
   }
-  else {
-    curr_blockno = ospfs_size2nblocks(*f_pos+1);
-    my_offset = *f_pos - (curr_blockno - 1)*OSPFS_BLKSIZE;
-  }
-  //eprintk("new size of file %d\n",oi->oi_size);
-  //eprintk("new position %d\n",*f_pos);
-  //eprintk("offset %d\n", my_offset);
   /*END EXERCISE*/
 
 	// Copy data block by block
@@ -1212,28 +1199,19 @@ ospfs_write(struct file *filp, const char __user *buffer, size_t count, loff_t *
 		// read user space.
 		// Keep track of the number of bytes moved in 'n'.
 		/* EXERCISE: Your code here */
-    if(my_offset != 0){
-      if((count+my_offset) > OSPFS_BLKSIZE){
-        n = OSPFS_BLKSIZE - my_offset;
-      }
-      else
-        n = count;
-    }
-    else if((count - amount) < OSPFS_BLKSIZE){
-      n = count - amount;
-    }
-    else
-      n = OSPFS_BLKSIZE;
+    
+    n = OSPFS_BLKSIZE - (*f_pos%OSPFS_BLKSIZE);
+    if(n > (count - amount)) n = count - amount;
+    
     //eprintk("block %d\n",blockno);
     //eprintk("end f_pos %d\n", *f_pos);
     //eprintk("offset %d\n", my_offset);
     //eprintk("n %d\n",n);
     //eprintk("count %d\n",count);
-		if(copy_from_user(data+my_offset,buffer,n)){
+		if(copy_from_user(data+(*f_pos%OSPFS_BLKSIZE),buffer,n)){
       retval = -EFAULT;
       goto done;
 		}
-		my_offset = 0;
 		/*END EXERCISE*/
 		
 		buffer += n;
